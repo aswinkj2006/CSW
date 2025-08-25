@@ -1,0 +1,632 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Customer Sentiment Watchdog</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #FFD700, #FF6B6B);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .status-bar {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .timestamp {
+            color: white;
+            opacity: 0.8;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        
+        .card h2 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card h2 i {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 20px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .metric:hover {
+            transform: scale(1.05);
+        }
+        
+        .metric h3 {
+            font-size: 2.5em;
+            margin: 10px 0 5px 0;
+            font-weight: bold;
+        }
+        
+        .metric p {
+            color: #666;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+        
+        .positive { color: #27ae60; }
+        .negative { color: #e74c3c; }
+        .neutral { color: #f39c12; }
+        .high-urgency { color: #e74c3c; }
+        .medium-urgency { color: #f39c12; }
+        .low-urgency { color: #27ae60; }
+        
+        .alert-item {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2);
+            border-left: 5px solid #e74c3c;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .alert-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(231,76,60,0.2);
+        }
+        
+        .urgent-item {
+            background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+            border-left: 5px solid #ff9800;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .urgent-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(255,152,0,0.2);
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin: 2px;
+        }
+        
+        .badge-positive { background: #d4edda; color: #155724; }
+        .badge-negative { background: #f8d7da; color: #721c24; }
+        .badge-neutral { background: #fff3cd; color: #856404; }
+        .badge-high { background: #f8d7da; color: #721c24; }
+        .badge-medium { background: #fff3cd; color: #856404; }
+        .badge-low { background: #d4edda; color: #155724; }
+        
+        .translation-box {
+            background: #e3f2fd;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 8px;
+            font-style: italic;
+            color: #1565c0;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 8px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .loading i {
+            font-size: 3em;
+            animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .no-alerts {
+            text-align: center;
+            padding: 40px;
+            color: #27ae60;
+            font-size: 1.2em;
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header h1 { font-size: 2rem; }
+            .grid { grid-template-columns: 1fr; }
+            .metrics { grid-template-columns: repeat(2, 1fr); }
+            .status-bar { flex-direction: column; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Customer Sentiment Watchdog</h1>
+            <p>Powered by DeepSeek V3 Intelligence</p>
+        </div>
+        
+        <div class="status-bar">
+            <button class="refresh-btn" onclick="refreshData()">
+                <i class="fas fa-sync-alt"></i> Refresh Data
+            </button>
+            <div class="timestamp" id="lastUpdate"></div>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h2><i class="fas fa-chart-pie"></i> Sentiment Overview</h2>
+                <div class="metrics" id="metrics">
+                    <div class="loading">
+                        <i class="fas fa-spinner"></i>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-globe"></i> Language Distribution</h2>
+                <div id="languages">
+                    <div class="loading">
+                        <i class="fas fa-spinner"></i>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-tags"></i> Category Breakdown</h2>
+                <div id="categories">
+                    <div class="loading">
+                        <i class="fas fa-spinner"></i>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-heart"></i> Emotion Analysis</h2>
+                <div id="emotions">
+                    <div class="loading">
+                        <i class="fas fa-spinner"></i>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card full-width">
+                <h2><i class="fas fa-chart-line"></i> Sentiment Trends</h2>
+                <div class="chart-container">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-exclamation-triangle"></i> High Priority Tickets</h2>
+                <div id="urgent">
+                    <div class="loading">
+                        <i class="fas fa-spinner"></i>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-bell"></i> Recent Negative Alerts</h2>
+                <div id="alerts">
+                    <div class="loading">
+                        <i class="fas fa-spinner"></i>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let trendsChart;
+        
+        function updateMetrics(data) {
+            const metricsDiv = document.getElementById('metrics');
+            const total = data.total_tickets;
+            
+            metricsDiv.innerHTML = `
+                <div class="metric">
+                    <h3 class="positive">${data.summary.positive}</h3>
+                    <p>Positive</p>
+                </div>
+                <div class="metric">
+                    <h3 class="neutral">${data.summary.neutral}</h3>
+                    <p>Neutral</p>
+                </div>
+                <div class="metric">
+                    <h3 class="negative">${data.summary.negative}</h3>
+                    <p>Negative</p>
+                </div>
+                <div class="metric">
+                    <h3>${total}</h3>
+                    <p>Total</p>
+                </div>
+                <div class="metric">
+                    <h3 class="${data.average_score >= 0 ? 'positive' : 'negative'}">${data.average_score}</h3>
+                    <p>Avg Score</p>
+                </div>
+                <div class="metric">
+                    <h3>${data.confidence_average}</h3>
+                    <p>AI Confidence</p>
+                </div>
+            `;
+        }
+        
+        function updateLanguages(languages) {
+            const langDiv = document.getElementById('languages');
+            if (Object.keys(languages).length === 0) {
+                langDiv.innerHTML = '<p>No language data available</p>';
+                return;
+            }
+            
+            const total = Object.values(languages).reduce((a, b) => a + b, 0);
+            langDiv.innerHTML = Object.entries(languages)
+                .sort(([,a], [,b]) => b - a)
+                .map(([lang, count]) => `
+                    <div class="stats-row">
+                        <span>${lang.charAt(0).toUpperCase() + lang.slice(1)}</span>
+                        <span><strong>${count}</strong> (${Math.round(count/total*100)}%)</span>
+                    </div>
+                `).join('');
+        }
+        
+        function updateCategories(categories) {
+            const catDiv = document.getElementById('categories');
+            if (Object.keys(categories).length === 0) {
+                catDiv.innerHTML = '<p>No category data available</p>';
+                return;
+            }
+            
+            const total = Object.values(categories).reduce((a, b) => a + b, 0);
+            catDiv.innerHTML = Object.entries(categories)
+                .sort(([,a], [,b]) => b - a)
+                .map(([cat, count]) => `
+                    <div class="stats-row">
+                        <span>${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
+                        <span><strong>${count}</strong> (${Math.round(count/total*100)}%)</span>
+                    </div>
+                `).join('');
+        }
+        
+        function updateEmotions(emotions) {
+            const emoDiv = document.getElementById('emotions');
+            if (Object.keys(emotions).length === 0) {
+                emoDiv.innerHTML = '<p>No emotion data available</p>';
+                return;
+            }
+            
+            const total = Object.values(emotions).reduce((a, b) => a + b, 0);
+            emoDiv.innerHTML = Object.entries(emotions)
+                .sort(([,a], [,b]) => b - a)
+                .map(([emotion, count]) => `
+                    <div class="stats-row">
+                        <span>${emotion.charAt(0).toUpperCase() + emotion.slice(1)}</span>
+                        <span><strong>${count}</strong> (${Math.round(count/total*100)}%)</span>
+                    </div>
+                `).join('');
+        }
+        
+        function updateAlerts(alerts) {
+            const alertsDiv = document.getElementById('alerts');
+            
+            if (alerts.length === 0) {
+                alertsDiv.innerHTML = '<div class="no-alerts"><i class="fas fa-check-circle"></i><br>No negative sentiment alerts!</div>';
+                return;
+            }
+            
+            alertsDiv.innerHTML = alerts.map(alert => `
+                <div class="alert-item">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                        <strong>Ticket #${alert.ticket_id}</strong>
+                        <div>
+                            <span class="badge badge-${alert.emotion}">${alert.emotion}</span>
+                            <span class="badge badge-negative">Score: ${alert.sentiment_score}</span>
+                        </div>
+                    </div>
+                    <p>${alert.message}</p>
+                    ${alert.translation ? `<div class="translation-box"><i class="fas fa-language"></i> Translation: ${alert.translation}</div>` : ''}
+                    <small style="color: #666;">
+                        ${alert.datetime} | ${alert.category} | ${alert.language} | Confidence: ${alert.confidence}
+                    </small>
+                </div>
+            `).join('');
+        }
+        
+        function updateUrgent(urgent) {
+            const urgentDiv = document.getElementById('urgent');
+            
+            if (urgent.length === 0) {
+                urgentDiv.innerHTML = '<div class="no-alerts"><i class="fas fa-check-circle"></i><br>No high priority tickets!</div>';
+                return;
+            }
+            
+            urgentDiv.innerHTML = urgent.map(ticket => `
+                <div class="urgent-item">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                        <strong>Ticket #${ticket.ticket_id}</strong>
+                        <div>
+                            <span class="badge badge-high">HIGH PRIORITY</span>
+                            <span class="badge badge-${ticket.emotion}">${ticket.emotion}</span>
+                        </div>
+                    </div>
+                    <p>${ticket.message}</p>
+                    ${ticket.translation !== ticket.message ? `<div class="translation-box"><i class="fas fa-language"></i> Translation: ${ticket.translation}</div>` : ''}
+                    <small style="color: #666;">
+                        ${ticket.datetime} | ${ticket.category} | Confidence: ${ticket.confidence}
+                    </small>
+                </div>
+            `).join('');
+        }
+        
+        function updateTrends(trends) {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            
+            if (trendsChart) {
+                trendsChart.destroy();
+            }
+            
+            trendsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trends.map(t => t.date),
+                    datasets: [
+                        {
+                            label: 'Positive',
+                            data: trends.map(t => t.positive),
+                            borderColor: '#27ae60',
+                            backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Neutral',
+                            data: trends.map(t => t.neutral),
+                            borderColor: '#f39c12',
+                            backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Negative',
+                            data: trends.map(t => t.negative),
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Daily Sentiment Trends',
+                            font: { size: 16, weight: 'bold' }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Tickets'
+                            },
+                            grid: { color: 'rgba(0,0,0,0.1)' }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            },
+                            grid: { color: 'rgba(0,0,0,0.1)' }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+        
+        async function loadData() {
+            try {
+                // Show loading state
+                document.getElementById('lastUpdate').textContent = 'Loading...';
+                
+                // Load summary data
+                const summaryResponse = await fetch('/api/summary');
+                const summaryData = await summaryResponse.json();
+                
+                updateMetrics(summaryData);
+                updateLanguages(summaryData.languages);
+                updateCategories(summaryData.categories);
+                updateEmotions(summaryData.emotions);
+                
+                // Load alerts
+                const alertsResponse = await fetch('/api/alerts');
+                const alertsData = await alertsResponse.json();
+                updateAlerts(alertsData.alerts);
+                
+                // Load urgent tickets
+                const urgentResponse = await fetch('/api/urgent');
+                const urgentData = await urgentResponse.json();
+                updateUrgent(urgentData.urgent);
+                
+                // Load trends
+                const trendsResponse = await fetch('/api/trends');
+                const trendsData = await trendsResponse.json();
+                updateTrends(trendsData.trends);
+                
+                // Update timestamp
+                document.getElementById('lastUpdate').textContent = `Last updated: ${new Date().toLocaleString()}`;
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('lastUpdate').textContent = 'Error loading data';
+            }
+        }
+        
+        async function refreshData() {
+            const refreshBtn = document.querySelector('.refresh-btn');
+            const originalText = refreshBtn.innerHTML;
+            
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            refreshBtn.disabled = true;
+            
+            try {
+                await fetch('/api/reload');
+                await loadData();
+            } finally {
+                refreshBtn.innerHTML = originalText;
+                refreshBtn.disabled = false;
+            }
+        }
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', loadData);
+        
+        // Auto-refresh every 5 minutes
+        setInterval(loadData, 300000);
+        
+        // Add some interactive features
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.metric')) {
+                e.target.closest('.metric').style.transform = 'scale(1.1)';
+                setTimeout(() => {
+                    e.target.closest('.metric').style.transform = '';
+                }, 200);
+            }
+        });
+    </script>
+</body>
+</html>
