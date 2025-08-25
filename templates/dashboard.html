@@ -3,7 +3,8 @@
 <html>
 <head>
     <title>AI Customer Sentiment Watchdog</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -26,6 +27,26 @@
             color: white;
             margin-bottom: 30px;
             text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(45deg, #4ECDC4, #45B7AF);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
         
         .header h1 {
@@ -247,27 +268,110 @@
             font-size: 1.2em;
         }
         
+        .ticket-filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .ticket-filters select {
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .ticket-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid #eee;
+            transition: all 0.3s ease;
+        }
+
+        .ticket-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .ticket-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .ticket-info {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .ticket-message {
+            font-size: 1.1em;
+            line-height: 1.4;
+            margin: 10px 0;
+        }
+
+        .sentiment-score {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .sentiment-score.positive {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .sentiment-score.negative {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .sentiment-score.neutral {
+            background: #fff3cd;
+            color: #856404;
+        }
+
         @media (max-width: 768px) {
             .container { padding: 10px; }
             .header h1 { font-size: 2rem; }
             .grid { grid-template-columns: 1fr; }
             .metrics { grid-template-columns: repeat(2, 1fr); }
             .status-bar { flex-direction: column; gap: 10px; }
+            .ticket-filters { flex-direction: column; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>AI Customer Sentiment Watchdog</h1>
-            <p>Powered by DeepSeek V3 Intelligence</p>
+            <div>
+                <h1>AI Customer Sentiment Watchdog</h1>
+                <p>Powered by DeepSeek V3 Intelligence</p>
+            </div>
+            <a href="/upload" class="upload-btn">
+                <i class="fas fa-upload"></i> Upload CSV
+            </a>
         </div>
         
         <div class="status-bar">
+            <div class="timestamp">Last updated: <span id="lastUpdate">Never</span></div>
             <button class="refresh-btn" onclick="refreshData()">
                 <i class="fas fa-sync-alt"></i> Refresh Data
             </button>
-            <div class="timestamp" id="lastUpdate"></div>
         </div>
         
         <div class="grid">
@@ -331,6 +435,29 @@
             <div class="card">
                 <h2><i class="fas fa-bell"></i> Recent Negative Alerts</h2>
                 <div id="alerts">
+                    <div class="loading">
+                        <i class="fas fa-spinner"></i>
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card full-width">
+                <h2><i class="fas fa-list"></i> All Tickets</h2>
+                <div class="ticket-filters">
+                    <select id="sentimentFilter" onchange="filterTickets()">
+                        <option value="all">All Sentiments</option>
+                        <option value="positive">Positive</option>
+                        <option value="neutral">Neutral</option>
+                        <option value="negative">Negative</option>
+                    </select>
+                    <select id="sortBy" onchange="filterTickets()">
+                        <option value="date">Sort by Date</option>
+                        <option value="score">Sort by Score</option>
+                        <option value="confidence">Sort by Confidence</option>
+                    </select>
+                </div>
+                <div id="allTickets">
                     <div class="loading">
                         <i class="fas fa-spinner"></i>
                         <p>Loading...</p>
@@ -482,8 +609,17 @@
         }
         
         function updateTrends(trends) {
-            const ctx = document.getElementById('trendsChart').getContext('2d');
+            const canvas = document.getElementById('trendsChart');
+            const ctx = canvas.getContext('2d');
             
+            if (!trends || trends.length === 0) {
+                canvas.style.display = 'none';
+                const container = canvas.parentElement;
+                container.innerHTML = '<div class="no-alerts"><i class="fas fa-chart-line"></i><br>No trend data available</div>';
+                return;
+            }
+            
+            canvas.style.display = 'block';
             if (trendsChart) {
                 trendsChart.destroy();
             }
@@ -558,10 +694,87 @@
             });
         }
         
+        let allTicketsData = [];
+
+        function getSentimentClass(score) {
+            if (score > 0.3) return 'positive';
+            if (score < -0.3) return 'negative';
+            return 'neutral';
+        }
+
+        function updateAllTickets(tickets) {
+            const ticketsDiv = document.getElementById('allTickets');
+            allTicketsData = tickets;
+            filterTickets();
+        }
+
+        function filterTickets() {
+            const ticketsDiv = document.getElementById('allTickets');
+            const sentimentFilter = document.getElementById('sentimentFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            let filteredTickets = [...allTicketsData];
+            
+            // Apply sentiment filter
+            if (sentimentFilter !== 'all') {
+                filteredTickets = filteredTickets.filter(ticket => {
+                    if (sentimentFilter === 'positive') return ticket.sentiment_score > 0.3;
+                    if (sentimentFilter === 'negative') return ticket.sentiment_score < -0.3;
+                    return ticket.sentiment_score >= -0.3 && ticket.sentiment_score <= 0.3;
+                });
+            }
+            
+            // Apply sorting
+            filteredTickets.sort((a, b) => {
+                if (sortBy === 'date') {
+                    return new Date(b.datetime) - new Date(a.datetime);
+                }
+                if (sortBy === 'score') {
+                    return b.sentiment_score - a.sentiment_score;
+                }
+                return b.confidence - a.confidence;
+            });
+            
+            if (filteredTickets.length === 0) {
+                ticketsDiv.innerHTML = '<div class="no-alerts"><i class="fas fa-inbox"></i><br>No tickets found</div>';
+                return;
+            }
+            
+            ticketsDiv.innerHTML = filteredTickets.map(ticket => `
+                <div class="ticket-item">
+                    <div class="ticket-header">
+                        <strong>Ticket #${ticket.ticket_id}</strong>
+                        <div class="sentiment-score ${getSentimentClass(ticket.sentiment_score)}">
+                            <i class="fas fa-${ticket.sentiment_score > 0.3 ? 'smile' : ticket.sentiment_score < -0.3 ? 'frown' : 'meh'}"></i>
+                            Score: ${ticket.sentiment_score.toFixed(2)}
+                        </div>
+                    </div>
+                    <div class="ticket-message">${ticket.message}</div>
+                    ${ticket.translation && ticket.translation !== ticket.message ? 
+                        `<div class="translation-box">
+                            <i class="fas fa-language"></i> Translation: ${ticket.translation}
+                        </div>` : ''
+                    }
+                    <div class="ticket-info">
+                        <span><i class="fas fa-calendar"></i> ${ticket.datetime}</span>
+                        <span><i class="fas fa-tag"></i> ${ticket.category}</span>
+                        <span><i class="fas fa-globe"></i> ${ticket.language}</span>
+                        <span><i class="fas fa-chart-bar"></i> Confidence: ${ticket.confidence.toFixed(2)}</span>
+                        <span><i class="fas fa-heart"></i> ${ticket.emotion}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
         async function loadData() {
             try {
                 // Show loading state
                 document.getElementById('lastUpdate').textContent = 'Loading...';
+                
+                // Load all data
+                const allTicketsResponse = await fetch('/api/all-tickets');
+                const allTicketsData = await allTicketsResponse.json();
+                updateAllTickets(allTicketsData.tickets);
                 
                 // Load summary data
                 const summaryResponse = await fetch('/api/summary');

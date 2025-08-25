@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload CSV - AI Sentiment Watchdog</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .upload-box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+        .upload-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #4a90e2;
+            background: #f8f9fa;
+        }
+        .btn {
+            background: #4a90e2;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #357abd;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .requirements {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .requirements h3 {
+            margin-bottom: 10px;
+        }
+        .requirements ul {
+            margin-left: 20px;
+        }
+        .requirements li {
+            margin: 5px 0;
+        }
+        #selectedFile {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e3f2fd;
+            border-radius: 5px;
+            display: none;
+        }
+        @media (max-width: 768px) {
+            .upload-box {
+                margin: 10px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="upload-box">
+        <h1>Upload CSV File</h1>
+        <p>Upload your customer feedback CSV for AI analysis</p>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form method="post" enctype="multipart/form-data" id="uploadForm">
+            <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                <i class="fas fa-cloud-upload-alt" style="font-size:48px;color:#4a90e2"></i>
+                <p>Click to select CSV or drag & drop</p>
+                <p style="font-size:0.9em;color:#666">Maximum file size: 16MB</p>
+                <div id="selectedFile"></div>
+            </div>
+            <input type="file" id="fileInput" name="file" style="display:none" accept=".csv" onchange="showSelected(this)">
+            
+            <div class="requirements">
+                <h3>Required CSV Format</h3>
+                <ul>
+                    <li><strong>ticket_id</strong> - Unique identifier for each ticket</li>
+                    <li><strong>message</strong> - Customer feedback text</li>
+                    <li><strong>date</strong> - Date in YYYY-MM-DD format</li>
+                    <li><strong>time</strong> - Time in HH:MM:SS format</li>
+                </ul>
+                <p style="margin-top:10px;font-style:italic;color:#666">
+                    Example: ticket_id,message,date,time<br>
+                    1,"Great product!",2024-01-15,10:30:00
+                </p>
+            </div>
+            
+            <div style="text-align:center">
+                <button type="submit" class="btn">Upload & Analyze</button>
+                <a href="/" class="btn" style="background:#6c757d">Back to Dashboard</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function showSelected(input) {
+            const div = document.getElementById('selectedFile');
+            if (input.files.length > 0) {
+                const file = input.files[0];
+                div.innerHTML = `<strong>Selected:</strong> ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`;
+                div.style.display = 'block';
+            } else {
+                div.style.display = 'none';
+            }
+        }
+        
+        const zone = document.querySelector('.upload-zone');
+        
+        zone.addEventListener('dragover', e => {
+            e.preventDefault();
+            zone.classList.add('dragover');
+        });
+        
+        zone.addEventListener('dragleave', e => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+        });
+        
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                document.getElementById('fileInput').files = e.dataTransfer.files;
+                showSelected(document.getElementById('fileInput'));
+            }
+        });
+        
+        document.getElementById('uploadForm').addEventListener('submit', e => {
+            const btn = document.querySelector('button[type="submit"]');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+            btn.disabled = true;
+        });
+    </script>
+</body>
+</html>
