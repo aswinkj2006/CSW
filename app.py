@@ -326,56 +326,7 @@ def api_reload():
     watchdog.load_data()
     return jsonify({'status': 'Data reloaded successfully'})
 
-@app.route('/upload', methods=['GET', 'POST'])
-def upload_file():
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            flash('No file selected', 'error')
-            return redirect(request.url)
-        
-        file = request.files['file']
-        if file.filename == '':
-            flash('No file selected', 'error')
-            return redirect(request.url)
-        
-        if file and allowed_file(file.filename):
-            try:
-                filename = secure_filename(file.filename)
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
-                
-                # Validate the uploaded CSV
-                test_df = pd.read_csv(filepath)
-                is_valid, message = watchdog.validate_csv_format(test_df)
-                
-                if not is_valid:
-                    os.remove(filepath)
-                    flash(f'Invalid CSV format: {message}', 'error')
-                    return redirect(request.url)
-                
-                # Set the new CSV file for analysis
-                watchdog.set_csv_file(filepath)
-                flash('File uploaded and analyzed successfully!', 'success')
-                return redirect(url_for('dashboard'))
-                
-            except Exception as e:
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-                flash(f'Error processing file: {str(e)}', 'error')
-                return redirect(request.url)
-        else:
-            flash('Please upload a CSV file', 'error')
-            return redirect(request.url)
-    
-    return render_template('upload.html')
 
-@app.route('/api/file-info')
-def api_file_info():
-    return jsonify({
-        'current_file': os.path.basename(watchdog.csv_file),
-        'file_exists': os.path.exists(watchdog.csv_file),
-        'total_records': len(watchdog.df) if not watchdog.df.empty else 0
-    })
 
 @app.route('/api/all-tickets')
 def api_all_tickets():
@@ -1347,17 +1298,6 @@ UPLOAD_TEMPLATE = '''
 </body>
 </html>
 '''
-
-# Create templates directory and files
-import os
-if not os.path.exists('templates'):
-    os.makedirs('templates')
-
-with open('templates/dashboard.html', 'w', encoding='utf-8') as f:
-    f.write(HTML_TEMPLATE)
-    
-with open('templates/upload.html', 'w', encoding='utf-8') as f:
-    f.write(UPLOAD_TEMPLATE)
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
