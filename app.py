@@ -59,8 +59,7 @@ Provide response in this exact JSON format:
                     {"role": "system", "content": "You are an expert customer sentiment analyst. Always respond with valid JSON only."},
                     {"role": "user", "content": prompt}
                 ],
-                "temperature": 0.3,
-                "max_tokens": 500
+                "temperature": 0.3
             }
             
             response = requests.post(OPENROUTER_URL, headers=self.headers, json=payload, timeout=15)
@@ -396,10 +395,7 @@ def api_all_tickets():
             })
     return jsonify({'tickets': sorted(tickets, key=lambda x: x['datetime'], reverse=True)})
 
-if __name__ == '__main__':
-    print('Starting Sentiment Watchdog on http://localhost:5000')
-    app.run(debug=True, host='0.0.0.0', port=5000)
-
+class SentimentWatchdog:
     def get_sentiment_summary(self):
         if self.df.empty:
             return {'positive': 0, 'negative': 0, 'neutral': 0}
@@ -1511,8 +1507,6 @@ with open('templates/upload.html', 'w', encoding='utf-8') as f:
     f.write(UPLOAD_TEMPLATE)
 
 if __name__ == '__main__':
-    print("AI Customer Sentiment Watchdog starting...")
-    print("Powered by DeepSeek V3 for advanced sentiment analysis")
-    print("Dashboard available at: http://localhost:5000")
-    print("Starting Sentiment Watchdog on http://localhost:5000")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.getenv('PORT', 5000))
+    print(f'Starting Sentiment Watchdog on port {port}')
+    app.run(host='0.0.0.0', port=port)
